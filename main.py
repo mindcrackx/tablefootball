@@ -93,20 +93,18 @@ class TableFootballScheduler:
         else:
             model += [encounter_vars[0] == ab_vs_cd_index]
 
-        # Hard Constraint 3: Second round should prioritize perfect position switching
+        # Hard Constraint 3: Second round must be truly optimal (perfect team mixing + position switching)
         if num_rounds >= 2:
-            # Prefer encounters that give all 4 players position switches
+            # Only allow the best Round 2 options: DA vs BC or BC vs DA (perfect 5/5 transition quality)
             optimal_round2_encounters = [
                 self.encounter_to_id.get(("DA", "BC"), -1),
-                self.encounter_to_id.get(("BC", "DA"), -1),
-                self.encounter_to_id.get(("BA", "DC"), -1),
-                self.encounter_to_id.get(("DC", "BA"), -1)
+                self.encounter_to_id.get(("BC", "DA"), -1)
             ]
             # Filter out any that don't exist (-1)
             optimal_round2_encounters = [idx for idx in optimal_round2_encounters if idx != -1]
 
             if optimal_round2_encounters:
-                # Create constraint that round 2 must be one of the optimal encounters
+                # Create constraint that round 2 must be one of the truly optimal encounters
                 round2_constraint = cp.any([encounter_vars[1] == idx for idx in optimal_round2_encounters])
                 model += [round2_constraint]
 
@@ -142,8 +140,10 @@ class TableFootballScheduler:
         for schedule in solutions:
             pos_score = self.calculate_position_switching_score(schedule)
             mix_score = self.calculate_team_mixing_score(schedule)
-            # Increased weight for position switching to prioritize perfect switches
-            total_score = mix_score * 3 + pos_score * 5
+            side_score = self.calculate_side_balance_score(schedule)
+            # Multi-objective optimization with correct priorities:
+            # 1. Position switching (highest) 2. Team mixing 3. Side balance (lowest)
+            total_score = pos_score * 10 + mix_score * 5 + side_score * 1
 
             if total_score > best_score:
                 best_score = total_score
@@ -206,6 +206,52 @@ class TableFootballScheduler:
             # Bonus for perfect switching rounds (all 4 players switch)
             if round_switches == 4:
                 total_score += 4  # Extra bonus for perfect rounds
+
+        return total_score
+
+    def calculate_side_balance_score(self, schedule: List[Tuple[str, str]]) -> int:
+        """
+        Calculate side balance score - how evenly teams are distributed across table sides.
+
+        Args:
+            schedule: List of encounters
+
+        Returns:
+            Side balance score (higher = better balance)
+        """
+        if len(schedule) == 0:
+            return 0
+
+        # Track which side each team plays on
+        side_1_count = {}  # Teams that played on side 1 (first position in encounter)
+        side_2_count = {}  # Teams that played on side 2 (second position in encounter)
+
+        # Initialize counts for all possible teams
+        for team in self.all_teams:
+            side_1_count[team] = 0
+            side_2_count[team] = 0
+
+        # Count side appearances
+        for team1, team2 in schedule:
+            side_1_count[team1] += 1
+            side_2_count[team2] += 1
+
+        # Calculate balance score
+        total_score = 0
+        total_teams_playing = 0
+
+        for team in self.all_teams:
+            side1_plays = side_1_count[team]
+            side2_plays = side_2_count[team]
+            total_plays = side1_plays + side2_plays
+
+            if total_plays > 0:
+                total_teams_playing += 1
+                # Perfect balance: equal plays on both sides
+                balance_diff = abs(side1_plays - side2_plays)
+                # Score: fewer difference = better (max points when perfectly balanced)
+                balance_score = max(0, total_plays - balance_diff)
+                total_score += balance_score
 
         return total_score
 
@@ -332,19 +378,54 @@ class TableFootballScheduler:
         for i, (team1, team2) in enumerate(schedule, 1):
             print(f"Round {i}: {team1} vs {team2}")
 
-            # Show positions
-            positions = self._get_positions((team1, team2))
-            pos_str = ", ".join(f"{p}={positions[p]}" for p in sorted(positions.keys()))
-            print(f"         Positions: {pos_str}")
-            print()
-
         # Calculate and display scores
         pos_score = self.calculate_position_switching_score(schedule)
         mix_score = self.calculate_team_mixing_score(schedule)
+        side_score = self.calculate_side_balance_score(schedule)
 
         print(f"Position Switching Score: {pos_score}")
         print(f"Team Mixing Score: {mix_score}")
-        print(f"Total Weighted Score: {mix_score * 3 + pos_score * 5}")
+        print(f"Side Balance Score: {side_score}")
+        print(f"Total Weighted Score: {pos_score * 10 + mix_score * 5 + side_score * 1}")
+
+        # Show detailed side balance breakdown
+        self._print_side_balance_details(schedule)
+
+    def _print_side_balance_details(self, schedule: List[Tuple[str, str]]) -> None:
+        """Print detailed side balance breakdown"""
+        if len(schedule) == 0:
+            return
+
+        print("\nSide Balance Analysis:")
+        print("-" * 30)
+
+        # Track which side each team plays on
+        side_1_count = {}  # Teams that played on side 1 (first position)
+        side_2_count = {}  # Teams that played on side 2 (second position)
+
+        # Initialize counts for all possible teams
+        for team in self.all_teams:
+            side_1_count[team] = 0
+            side_2_count[team] = 0
+
+        # Count side appearances
+        for team1, team2 in schedule:
+            side_1_count[team1] += 1
+            side_2_count[team2] += 1
+
+        # Display results
+        print("Team | Side 1 | Side 2 | Balance")
+        print("-" * 30)
+
+        for team in sorted(self.all_teams):
+            side1_plays = side_1_count[team]
+            side2_plays = side_2_count[team]
+            total_plays = side1_plays + side2_plays
+
+            if total_plays > 0:
+                balance_diff = abs(side1_plays - side2_plays)
+                balance_status = "✅" if balance_diff <= 1 else "⚠️"
+                print(f" {team}   |   {side1_plays:2d}   |   {side2_plays:2d}   | {balance_status} ({balance_diff})")
 
 
 def main():
