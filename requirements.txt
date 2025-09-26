@@ -1,0 +1,3 @@
+# Table Football Tournament Scheduler Dependencies
+cpmpy>=0.9.26
+pytest>=8.0.0

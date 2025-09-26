@@ -48,10 +48,13 @@ We need to create an optimal scheduling algorithm for table football tournaments
 ### 4 Players - Round Progression
 *Note: In team notation, first letter = Defense, second letter = Attack*
 
+**Important**: For consistency and readability, **Round 1 always starts with AB vs CD**. In practice, actual player names will be randomly assigned to letters A, B, C, D before the tournament begins.
+
 ```
 Round 1: AB vs CD  // A=Defense, B=Attack vs C=Defense, D=Attack
-Round 2: CA vs DB  // Different teams + all players switch positions
-Round 3: AD vs BC  // Different teams + all players switch positions
+Round 2: DA vs BC  // Different teams + all players switch positions
+Round 3: AD vs CB  // same teams + all players switch positions
+Round 3: BA vs DC  // different teams + all players switch positions
 ```
 
 ### 5 Players - Round Progression
