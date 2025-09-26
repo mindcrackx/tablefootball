@@ -19,8 +19,8 @@ class ImprovedTableFootballScheduler:
     """
 
     def __init__(self, players: List[str]):
-        if len(players) < 4 or len(players) > 6:
-            raise ValueError("Supports 4-6 players only")
+        if len(players) < 4 or len(players) > 10:
+            raise ValueError("Supports 4-10 players only")
 
         self.players = players
         self.num_players = len(players)
@@ -88,24 +88,44 @@ class ImprovedTableFootballScheduler:
             'teammate_frequencies': {player: {} for player in self.players}
         }
 
-        # Define ABSOLUTE sitting rotation for 5 players
-        # Round 1: E, Round 2: A, Round 3: B, Round 4: C, Round 5: D, Round 6: E...
-        sitting_rotation = ['E', 'A', 'B', 'C', 'D']
+        # Calculate how many players sit each round
+        sitting_count = self.num_players - 4  # Always 4 players play, rest sit
+
+        # Define ABSOLUTE sitting rotation for any number of players
+        # For 5 players: 1 sits each round, cycle through E,A,B,C,D
+        # For 6 players: 2 sit each round, cycle through all combinations
+        # For 7+ players: 3+ sit each round, cycle through all combinations
+
+        if self.num_players == 5:
+            # Simple rotation for 5 players: one player sits each round
+            sitting_rotation = [self.players[4:]]  # [['E']]
+            for i in range(4):
+                sitting_rotation.append([self.players[i]])  # [['A'], ['B'], ['C'], ['D']]
+        else:
+            # For 6+ players: generate fair rotation of sitting combinations
+            sitting_rotation = self._generate_fair_sitting_rotation(sitting_count)
 
         for round_num in range(1, num_rounds + 1):
             # MANDATORY: Determine who MUST sit this round
-            sitting_player = sitting_rotation[(round_num - 1) % 5]
+            sitting_players_list = sitting_rotation[(round_num - 1) % len(sitting_rotation)]
+            sitting_players_str = ''.join(sorted(sitting_players_list))
 
             # Get the 4 playing players
-            playing_players = [p for p in self.players if p != sitting_player]
+            playing_players = [p for p in self.players if p not in sitting_players_list]
 
             if round_num == 1:
-                # Round 1 is standardized: AB vs CD
-                encounter = (round_num, 'A', 'B', 'C', 'D', sitting_player)
+                # Round 1 is standardized: AB vs CD, but we must use the actual playing players
+                # If A,B,C,D are not all playing (some might be sitting), pick the first 4 playing players
+                if len(playing_players) >= 4 and all(p in playing_players for p in ['A', 'B', 'C', 'D']):
+                    encounter = (round_num, 'A', 'B', 'C', 'D', sitting_players_str)
+                else:
+                    # Use the first 4 playing players if A,B,C,D are not all available
+                    p = playing_players  # shorthand
+                    encounter = (round_num, p[0], p[1], p[2], p[3], sitting_players_str)
             else:
                 # Find best encounter among the playing players
                 encounter = self._find_best_encounter_with_sitting(
-                    round_num, playing_players, sitting_player, state
+                    round_num, playing_players, sitting_players_str, state
                 )
 
             schedule.append(encounter)
@@ -114,8 +134,74 @@ class ImprovedTableFootballScheduler:
         print(f"Sitting-enforced schedule complete: {len(schedule)} rounds")
         return schedule
 
+    def _generate_fair_sitting_rotation(self, sitting_count: int) -> List[List[str]]:
+        """Generate a fair rotation where each player sits equally often"""
+
+        # For N players with K sitting each round:
+        # Each player should sit 1 out of every (N/K) rounds
+        #
+        # For 6 players, 2 sit each round: each player sits 1 out of every 3 rounds
+        # Pattern: AB, CD, EF, AB, CD, EF, ...
+        #
+        # For 7 players, 3 sit each round: each player sits 3 out of every 7 rounds
+        # This is more complex, but we can create a repeating cycle
+
+        rotation_length = self.num_players // sitting_count
+
+        if self.num_players % sitting_count != 0:
+            # Handle cases where players don't divide evenly
+            rotation_length = self.num_players
+
+        sitting_rotation = []
+
+        if sitting_count == 1:
+            # Simple case: 5 players, 1 sits each round
+            # E, A, B, C, D, E, A, B, C, D...
+            for i in range(self.num_players):
+                sitting_rotation.append([self.players[i]])
+
+        elif sitting_count == 2 and self.num_players == 6:
+            # 6 players, 2 sit each round: AB, CD, EF, AB, CD, EF...
+            pairs = [
+                [self.players[0], self.players[1]],  # AB
+                [self.players[2], self.players[3]],  # CD
+                [self.players[4], self.players[5]]   # EF
+            ]
+            for _ in range(20):  # Repeat enough times for long tournaments
+                sitting_rotation.extend(pairs)
+
+        elif sitting_count == 3 and self.num_players == 7:
+            # 7 players, 3 sit each round
+            # Create a pattern where each player sits 3 out of every 7 rounds
+            # This requires a more complex 7-round cycle
+            groups = [
+                [self.players[0], self.players[1], self.players[2]],  # ABC
+                [self.players[3], self.players[4], self.players[5]],  # DEF
+                [self.players[6], self.players[0], self.players[3]],  # GAD
+                [self.players[1], self.players[4], self.players[2]],  # BEC
+                [self.players[5], self.players[6], self.players[1]],  # FGB
+                [self.players[2], self.players[3], self.players[4]],  # CDE
+                [self.players[0], self.players[5], self.players[6]]   # AFG
+            ]
+            for _ in range(15):  # Repeat enough times
+                sitting_rotation.extend(groups)
+        else:
+            # Fallback: create a simple pattern that tries to distribute evenly
+            # Round-robin style where we cycle through player indices
+            for round_offset in range(self.num_players * 2):  # Create enough rounds
+                sitting_players = []
+                for i in range(sitting_count):
+                    player_index = (round_offset + i) % self.num_players
+                    sitting_players.append(self.players[player_index])
+                sitting_rotation.append(sitting_players)
+
+        print(f"Generated {len(sitting_rotation)} sitting combinations for {self.num_players} players")
+        print(f"Pattern repeats every {rotation_length} rounds for fair distribution")
+
+        return sitting_rotation
+
     def _find_best_encounter_with_sitting(self, round_num: int, playing_players: List[str],
-                                        sitting_player: str, state: Dict) -> Tuple[int, str, str, str, str, str]:
+                                        sitting_players: str, state: Dict) -> Tuple[int, str, str, str, str, str]:
         """Find best encounter given fixed sitting player and playing players"""
 
         # Generate all possible encounters with these specific playing players
@@ -128,7 +214,7 @@ class ImprovedTableFootballScheduler:
             # All position assignments
             for t1_def, t1_att in permutations(team1_players, 2):
                 for t2_def, t2_att in permutations(team2_players, 2):
-                    encounter = (round_num, t1_def, t1_att, t2_def, t2_att, sitting_player)
+                    encounter = (round_num, t1_def, t1_att, t2_def, t2_att, sitting_players)
                     possible_encounters.append(encounter)
 
         # Score each encounter and pick the best
@@ -1197,8 +1283,8 @@ class ImprovedTableFootballScheduler:
 def main():
     """Main function with command line support"""
     parser = argparse.ArgumentParser(description='Improved Table Football Tournament Scheduler')
-    parser.add_argument('--players', '-p', type=int, default=5, choices=[4, 5, 6],
-                        help='Number of players (default: 5)')
+    parser.add_argument('--players', '-p', type=int, default=5,
+                        help='Number of players (4-10 supported, default: 5)')
     parser.add_argument('--rounds', '-r', type=int, default=20,
                         help='Number of rounds (default: 20)')
     parser.add_argument('--verbose', '-v', action='store_true',
