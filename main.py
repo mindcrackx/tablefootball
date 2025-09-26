@@ -5,6 +5,8 @@ Optimizes for unique encounters and position switching
 import cpmpy as cp
 import argparse
 import sys
+import csv
+import os
 from itertools import combinations, permutations
 from typing import List, Tuple, Dict, Set
 
@@ -156,7 +158,9 @@ class TableFootballScheduler:
                 else:
                     model += [encounter_vars[0] == first_index]
 
-        # Hard Constraint 3: Second round optimization (4 players only for now)
+        # Let the scoring system handle optimization naturally - no hard constraints for early rounds
+
+        # Hard Constraint 4: Second round optimization (4 players only)
         if num_rounds >= 2 and self.num_players == 4:
             # Only allow the best Round 2 options: DA vs BC or BC vs DA (perfect 5/5 transition quality)
             optimal_round2_encounters = [
@@ -172,6 +176,7 @@ class TableFootballScheduler:
                 model += [round2_constraint]
 
         # Hard Constraint 4: Sitting fairness (for 5-6 players only)
+        # Make it a softer constraint to allow better team mixing
         if self.num_players > 4:
             self._add_sitting_fairness_constraints(model, encounter_vars, num_rounds)
 
@@ -180,7 +185,7 @@ class TableFootballScheduler:
 
         # Solve the model and find the best solution
         solutions = []
-        max_solutions = min(500, len(self.all_encounters))  # Increased search space for better optimization
+        max_solutions = min(10000, len(self.all_encounters))  # MASSIVE search space for optimal team mixing
 
         # Define callback to collect solutions
         def collect_solution():
@@ -208,8 +213,14 @@ class TableFootballScheduler:
             side_score = self.calculate_side_balance_score(schedule)
             sitting_score = self.calculate_sitting_fairness_score(schedule)
             # Multi-objective optimization with priorities:
-            # 1. Position switching (highest) 2. Team mixing 3. Sitting fairness 4. Side balance (lowest)
-            total_score = pos_score * 10 + mix_score * 5 + sitting_score * 3 + side_score * 1
+            # For 5+ players: Team mixing becomes critically important to match PROBLEM.md optimal patterns
+            if self.num_players > 4:
+                # Sitting rotation is enforced as hard constraint, so optimize within those constraints:
+                # 1. Team mixing (MASSIVELY prioritized) 2. Position switching 3. Sitting fairness 4. Side balance
+                total_score = mix_score * 100 + pos_score * 15 + sitting_score * 5 + side_score * 1
+            else:
+                # 4 players: original priorities
+                total_score = pos_score * 10 + mix_score * 8 + sitting_score * 3 + side_score * 1
 
             if total_score > best_score:
                 best_score = total_score
@@ -223,12 +234,13 @@ class TableFootballScheduler:
         This is the HIGHEST PRIORITY for 5-6 players - each player must sit equally.
         """
         if self.num_players == 5:
-            # 5 players: Perfect rotation - each player sits every 5th round
-            # Round 1: E sits, Round 2: A sits, Round 3: B sits, Round 4: C sits, Round 5: D sits, etc.
-            sitting_rotation = ['E', 'A', 'B', 'C', 'D']  # Starting rotation after E sits in round 1
+            # 5 players: ABSOLUTE HARD CONSTRAINT - Perfect sitting rotation (NON-NEGOTIABLE)
+            # This is the HIGHEST PRIORITY - no flexibility allowed
+            # Pattern: E sits round 1, A sits round 2, B sits round 3, C sits round 4, D sits round 5, repeat
+            sitting_rotation = ['E', 'A', 'B', 'C', 'D']
 
             for round_idx in range(num_rounds):
-                # Determine who should sit in this round based on perfect rotation
+                # Determine who MUST sit in this round (absolute requirement)
                 sitting_player_idx = round_idx % 5
                 required_sitting_player = sitting_rotation[sitting_player_idx]
 
@@ -240,7 +252,8 @@ class TableFootballScheduler:
                         valid_encounter_indices.append(encounter_idx)
 
                 if valid_encounter_indices:
-                    # This round MUST choose an encounter where the required player sits
+                    # HARD CONSTRAINT: This round MUST use an encounter where required player sits
+                    # This constraint cannot be violated under any circumstances
                     sitting_constraint = cp.any([encounter_vars[round_idx] == idx for idx in valid_encounter_indices])
                     model += [sitting_constraint]
 
@@ -460,6 +473,26 @@ class TableFootballScheduler:
             transition_score = self._calculate_transition_quality(enc1, enc2)
             total_score += transition_score
 
+        # Additional penalty for repeated teams across the entire schedule
+        team_frequency = {}
+        for encounter in schedule:
+            team1, team2, _ = self._extract_encounter_info(encounter)
+
+            # Count each team composition
+            team1_sorted = ''.join(sorted(team1))
+            team2_sorted = ''.join(sorted(team2))
+
+            team_frequency[team1_sorted] = team_frequency.get(team1_sorted, 0) + 1
+            team_frequency[team2_sorted] = team_frequency.get(team2_sorted, 0) + 1
+
+        # Penalize teams that appear too frequently (balanced approach)
+        variety_penalty = 0
+        for team, count in team_frequency.items():
+            if count > len(schedule) // 3:  # If a team appears more than 1/3 of rounds
+                variety_penalty += (count - len(schedule) // 3) * 5  # Moderate penalty for overuse
+
+        total_score -= variety_penalty
+
         return total_score
 
     def _calculate_transition_quality(self, enc1, enc2) -> int:
@@ -484,13 +517,11 @@ class TableFootballScheduler:
         teams1 = {frozenset(t1_1), frozenset(t1_2)}
         teams2 = {frozenset(t2_1), frozenset(t2_2)}
 
-        # Check if team compositions are identical
+        # Check if team compositions are identical (same players as teammates)
         if teams1 == teams2:
-            # Same teams - check if positions switched
-            if (t1_1 != t2_1 and t1_1 != t2_2) or (t1_2 != t2_1 and t1_2 != t2_2):
-                return 3  # Same teams, positions switched
-            else:
-                return 2  # Minimal changes
+            # Same teams - this is TERRIBLE for team mixing! Players keep same teammates
+            # Even if positions switch, teammates staying together is horrible mixing
+            return 1  # Terrible: same teammates (almost as bad as exact repetition)
         else:
             # Different team compositions
             # Check if all players changed teammates (only for players who are playing in both rounds)
@@ -584,7 +615,11 @@ class TableFootballScheduler:
         if self.num_players > 4:
             print(f"Sitting Fairness Score: {sitting_score}")
         print(f"Side Balance Score: {side_score}")
-        print(f"Total Weighted Score: {pos_score * 10 + mix_score * 5 + sitting_score * 3 + side_score * 1}")
+        if self.num_players > 4:
+            total_weighted = mix_score * 100 + pos_score * 15 + sitting_score * 5 + side_score * 1
+        else:
+            total_weighted = pos_score * 10 + mix_score * 8 + sitting_score * 3 + side_score * 1
+        print(f"Total Weighted Score: {total_weighted}")
 
         # Show detailed breakdowns
         if self.num_players > 4:
@@ -619,6 +654,34 @@ class TableFootballScheduler:
             difference = sits - min_sits
             fairness_status = "✅" if difference <= 1 else "⚠️"
             print(f"   {player}   |  {sits:2d}  | {fairness_status} (+{difference})")
+
+    def export_to_csv(self, schedule, filename: str) -> None:
+        """
+        Export tournament schedule to CSV format.
+
+        Args:
+            schedule: Tournament schedule to export
+            filename: Output CSV filename
+        """
+        # Create directory if it doesn't exist
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+
+        with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
+            writer = csv.writer(csvfile)
+
+            # Write header
+            if self.num_players == 4:
+                writer.writerow(['team1', 'team2'])
+            else:
+                writer.writerow(['team1', 'team2', 'sitting'])
+
+            # Write schedule data
+            for encounter in schedule:
+                team1, team2, sitting = self._extract_encounter_info(encounter)
+                if self.num_players == 4:
+                    writer.writerow([team1, team2])
+                else:
+                    writer.writerow([team1, team2, sitting])
 
     def _print_side_balance_details(self, schedule) -> None:
         """Print detailed side balance breakdown"""
@@ -665,6 +728,10 @@ def main():
                         help='Number of players (default: 5)')
     parser.add_argument('--rounds', '-r', type=int, default=50,
                         help='Number of rounds to generate (default: 50)')
+    parser.add_argument('--export-csv', type=str, metavar='FILENAME',
+                        help='Export schedule to CSV file')
+    parser.add_argument('--quiet', '-q', action='store_true',
+                        help='Suppress console output (useful with --export-csv)')
 
     args = parser.parse_args()
 
@@ -672,15 +739,25 @@ def main():
     player_names = [chr(ord('A') + i) for i in range(args.players)]
     scheduler = TableFootballScheduler(player_names)
 
-    print(f"🏓 Table Football Tournament Scheduler")
-    print(f"Players: {args.players} ({', '.join(player_names)})")
-    print(f"Maximum possible unique encounters: {len(scheduler.all_encounters)}")
-    print()
+    if not args.quiet:
+        print(f"🏓 Table Football Tournament Scheduler")
+        print(f"Players: {args.players} ({', '.join(player_names)})")
+        print(f"Maximum possible unique encounters: {len(scheduler.all_encounters)}")
+        print()
 
     # Generate schedule
     try:
         schedule = scheduler.generate_schedule(args.rounds)
-        scheduler.print_schedule(schedule)
+
+        if not args.quiet:
+            scheduler.print_schedule(schedule)
+
+        # Export to CSV if requested
+        if args.export_csv:
+            scheduler.export_to_csv(schedule, args.export_csv)
+            if not args.quiet:
+                print(f"\n✅ Tournament exported to: {args.export_csv}")
+
     except ValueError as e:
         print(f"Error: {e}")
         sys.exit(1)
