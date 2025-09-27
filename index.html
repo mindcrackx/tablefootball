@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Table Football Tournament</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class'
+        }
+    </script>
     <style>
         .player-position {
             @apply w-16 h-16 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold text-lg shadow-lg;
@@ -17,15 +22,54 @@
         .team-label {
             @apply text-sm font-semibold text-gray-700 mb-2;
         }
+        .dark .team-label {
+            @apply text-gray-300;
+        }
+        .dark .table-field {
+            @apply bg-green-600;
+            background: linear-gradient(45deg, #059669 25%, #047857 25%, #047857 50%, #059669 50%, #059669 75%, #047857 75%);
+            background-size: 20px 20px;
+        }
+        .dark .player-position {
+            @apply bg-blue-600;
+        }
+        .theme-toggle {
+            position: fixed;
+            top: 1.5rem;
+            right: 1.5rem;
+            width: 2rem;
+            height: 2rem;
+            background-color: white;
+            border-radius: 50%;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            z-index: 50;
+        }
+        .theme-toggle:hover {
+            transform: scale(1.1);
+        }
+        .dark .theme-toggle {
+            background-color: #374151;
+        }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
+<body class="bg-gray-100 dark:bg-gray-900 min-h-screen transition-colors duration-300">
+    <!-- Theme Toggle -->
+    <div id="theme-toggle" class="theme-toggle">
+        <span id="theme-icon">☀️</span>
+    </div>
+
     <!-- Setup View -->
     <div id="setup-view" class="container mx-auto px-4 py-8 max-w-md">
-        <h1 class="text-3xl font-bold text-center mb-8 text-gray-800">Table Football Tournament</h1>
+        <h1 class="text-3xl font-bold text-center mb-8 text-gray-800 dark:text-gray-100">Table Football Tournament</h1>
 
-        <div class="bg-white rounded-lg shadow-lg p-6">
-            <h2 class="text-xl font-semibold mb-4 text-gray-700">Enter Player Names</h2>
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+            <h2 class="text-xl font-semibold mb-4 text-gray-700 dark:text-gray-200">Enter Player Names</h2>
 
             <div id="player-inputs" class="space-y-3 mb-6">
                 <!-- Player inputs will be generated here -->
@@ -48,13 +92,13 @@
 
     <!-- Game View -->
     <div id="game-view" class="hidden container mx-auto px-4 py-4 max-w-2xl">
-        <div class="bg-white rounded-lg shadow-lg p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4">
             <!-- Header -->
             <div class="flex justify-between items-center mb-4">
                 <button id="back-to-setup-btn" class="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm">
                     ← Back
                 </button>
-                <h2 id="round-display" class="text-lg font-bold text-gray-800">Round 1</h2>
+                <h2 id="round-display" class="text-lg font-bold text-gray-800 dark:text-gray-100">Round 1</h2>
                 <div class="w-16"></div> <!-- Spacer for centering -->
             </div>
 
@@ -99,9 +143,9 @@
             </div>
 
             <!-- Sitting Players -->
-            <div id="sitting-display" class="hidden bg-yellow-100 rounded-lg p-3 mb-4">
-                <div class="text-sm font-medium text-yellow-800">Sitting this round:</div>
-                <div id="sitting-players" class="text-lg font-bold text-yellow-900"></div>
+            <div id="sitting-display" class="hidden bg-yellow-100 dark:bg-yellow-800 rounded-lg p-3 mb-4">
+                <div class="text-sm font-medium text-yellow-800 dark:text-yellow-200">Sitting this round:</div>
+                <div id="sitting-players" class="text-lg font-bold text-yellow-900 dark:text-yellow-100"></div>
             </div>
 
             <!-- Navigation -->
@@ -109,7 +153,7 @@
                 <button id="prev-round-btn" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg font-medium">
                     ← Previous
                 </button>
-                <div id="round-counter" class="text-sm text-gray-600">1 / 24</div>
+                <div id="round-counter" class="text-sm text-gray-600 dark:text-gray-400">1 / 24</div>
                 <button id="next-round-btn" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg font-medium">
                     Next →
                 </button>
@@ -168,7 +212,7 @@
                         type="text"
                         placeholder="Player ${player.letter} name"
                         value="${player.name}"
-                        class="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        class="flex-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         onchange="updatePlayerName(${index}, this.value)"
                     >
                     ${players.length > 4 ? `
@@ -399,8 +443,38 @@
             localStorage.removeItem('tablefootball-tournament');
         }
 
+        // Dark mode functions
+        function initializeTheme() {
+            const savedTheme = localStorage.getItem('tablefootball-theme') || 'light';
+            const isDark = savedTheme === 'dark';
+
+            if (isDark) {
+                document.documentElement.classList.add('dark');
+                document.getElementById('theme-icon').textContent = '🌙';
+            } else {
+                document.documentElement.classList.remove('dark');
+                document.getElementById('theme-icon').textContent = '☀️';
+            }
+        }
+
+        function toggleTheme() {
+            const isDark = document.documentElement.classList.contains('dark');
+            const newTheme = isDark ? 'light' : 'dark';
+
+            if (isDark) {
+                document.documentElement.classList.remove('dark');
+                document.getElementById('theme-icon').textContent = '☀️';
+            } else {
+                document.documentElement.classList.add('dark');
+                document.getElementById('theme-icon').textContent = '🌙';
+            }
+
+            localStorage.setItem('tablefootball-theme', newTheme);
+        }
+
         // Event listeners
         document.addEventListener('DOMContentLoaded', function() {
+            initializeTheme(); // Initialize theme first
             initializePlayers();
 
             document.getElementById('add-player-btn').addEventListener('click', addPlayer);
@@ -409,6 +483,7 @@
             document.getElementById('back-to-setup-btn').addEventListener('click', showSetupView);
             document.getElementById('prev-round-btn').addEventListener('click', prevRound);
             document.getElementById('next-round-btn').addEventListener('click', nextRound);
+            document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
         });
     </script>
 </body>
