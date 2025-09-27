@@ -12,26 +12,150 @@
     </script>
     <style>
         .player-position {
-            @apply w-16 h-16 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold text-lg shadow-lg;
+            @apply w-16 h-16 flex items-center justify-center text-xl;
+            font-weight: 700;
+            font-family: Arial, sans-serif;
+            color: black;
+            text-shadow: 1px 1px 2px rgba(255,255,255,0.8);
         }
-        .table-field {
-            @apply bg-green-300 rounded-lg p-6 relative;
-            background: linear-gradient(45deg, #86efac 25%, #4ade80 25%, #4ade80 50%, #86efac 50%, #86efac 75%, #4ade80 75%);
-            background-size: 20px 20px;
+        .foosball-table {
+            background: linear-gradient(45deg, #8B4513 0%, #A0522D 25%, #8B4513 50%, #A0522D 75%, #8B4513 100%);
+            border: 8px solid #654321;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.3), 0 8px 16px rgba(0,0,0,0.2);
+            position: relative;
+            aspect-ratio: 3/4;
+            max-width: 450px;
+            margin: 0 auto;
+            height: 420px;
         }
-        .team-label {
-            @apply text-sm font-semibold text-gray-700 mb-2;
+        .playing-field {
+            background: linear-gradient(180deg, #22c55e 0%, #16a34a 30%, #22c55e 50%, #16a34a 70%, #22c55e 100%);
+            border: 3px solid #ffffff;
+            border-radius: 8px;
+            height: 100%;
+            position: relative;
+            overflow: hidden;
+            box-shadow: inset 0 2px 8px rgba(0,0,0,0.2);
         }
-        .dark .team-label {
-            @apply text-gray-300;
+        .goal-area {
+            position: absolute;
+            left: 25%;
+            width: 50%;
+            height: 12%;
+            background: rgba(255,255,255,0.15);
+            border: 2px solid rgba(255,255,255,0.4);
         }
-        .dark .table-field {
-            @apply bg-green-600;
-            background: linear-gradient(45deg, #059669 25%, #047857 25%, #047857 50%, #059669 50%, #059669 75%, #047857 75%);
-            background-size: 20px 20px;
+        .goal-area.top {
+            top: 0;
+            border-top: none;
+            border-radius: 0 0 25px 25px;
+        }
+        .goal-area.bottom {
+            bottom: 0;
+            border-bottom: none;
+            border-radius: 25px 25px 0 0;
+        }
+        .center-line {
+            position: absolute;
+            top: 50%;
+            left: 8%;
+            right: 8%;
+            height: 3px;
+            background: white;
+            transform: translateY(-50%);
+            border-radius: 2px;
+        }
+        .center-circle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 70px;
+            height: 70px;
+            border: 3px solid white;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .team-area {
+            position: absolute;
+            width: 100%;
+            height: 45%;
+            display: flex;
+            flex-direction: row;
+            justify-content: space-around;
+            align-items: center;
+            z-index: 3;
+        }
+        .team-area.team1 {
+            top: 5%;
+        }
+        .team-area.team2 {
+            bottom: 5%;
+        }
+        .player-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+        .position-indicator {
+            font-size: 11px;
+            font-weight: bold;
+            color: rgba(255,255,255,0.9);
+            margin-bottom: 6px;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.3);
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+        .player-name-display {
+            font-size: 12px;
+            font-weight: 600;
+            color: #1f2937;
+            background: rgba(255,255,255,0.95);
+            border-radius: 6px;
+            padding: 3px 8px;
+            margin-top: 6px;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+            min-width: 70px;
+            text-align: center;
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+        .team-title {
+            position: absolute;
+            font-weight: bold;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.9);
+            font-size: 16px;
+            z-index: 4;
+            background: rgba(0,0,0,0.4);
+            padding: 4px 12px;
+            border-radius: 15px;
+        }
+        .team-title.team1-title {
+            top: 5px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        .team-title.team2-title {
+            bottom: 5px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        .dark .foosball-table {
+            background: linear-gradient(45deg, #4A4A4A 0%, #5A5A5A 25%, #4A4A4A 50%, #5A5A5A 75%, #4A4A4A 100%);
+            border-color: #2D2D2D;
+        }
+        .dark .playing-field {
+            background: linear-gradient(180deg, #166534 0%, #14532d 30%, #166534 50%, #14532d 70%, #166534 100%);
+        }
+        .dark .player-name-display {
+            background: rgba(255,255,255,0.9);
         }
         .dark .player-position {
-            @apply bg-blue-600;
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
         }
         .theme-toggle {
             position: fixed;
@@ -102,41 +226,47 @@
                 <div class="w-16"></div> <!-- Spacer for centering -->
             </div>
 
-            <!-- Table Football Field -->
-            <div class="table-field mb-4 min-h-[400px] flex">
-                <!-- Team 1 (Left Side) -->
-                <div class="flex-1 flex flex-col justify-center items-center p-4">
-                    <div class="team-label text-center mb-6">Team 1</div>
-                    <div class="space-y-8">
-                        <div class="text-center">
-                            <div class="text-sm text-gray-900 mb-2 font-bold">Defense</div>
-                            <div id="pos-t1-def" class="player-position mx-auto">A</div>
-                            <div id="name-t1-def" class="text-base mt-2 font-black text-gray-900 bg-white bg-opacity-90 rounded px-3 py-1.5">Player A</div>
+            <!-- Foosball Table -->
+            <div class="foosball-table mb-4">
+                <div class="playing-field">
+                    <!-- Goal Areas -->
+                    <div class="goal-area top"></div>
+                    <div class="goal-area bottom"></div>
+
+                    <!-- Center Line and Circle -->
+                    <div class="center-line"></div>
+                    <div class="center-circle"></div>
+
+
+                    <!-- Team Titles -->
+                    <div class="team-title team1-title">Team 1</div>
+                    <div class="team-title team2-title">Team 2</div>
+
+                    <!-- Team 1 Area (Top) -->
+                    <div class="team-area team1">
+                        <div class="player-container">
+                            <div class="position-indicator">Defense</div>
+                            <div id="pos-t1-def" class="player-position">A</div>
+                            <div id="name-t1-def" class="player-name-display">Player A</div>
                         </div>
-                        <div class="text-center">
-                            <div class="text-sm text-gray-900 mb-2 font-bold">Attack</div>
-                            <div id="pos-t1-att" class="player-position mx-auto">B</div>
-                            <div id="name-t1-att" class="text-base mt-2 font-black text-gray-900 bg-white bg-opacity-90 rounded px-3 py-1.5">Player B</div>
+                        <div class="player-container">
+                            <div class="position-indicator">Attack</div>
+                            <div id="pos-t2-att" class="player-position">D</div>
+                            <div id="name-t2-att" class="player-name-display">Player D</div>
                         </div>
                     </div>
-                </div>
 
-                <!-- Center Line -->
-                <div class="border-l-4 border-white border-dashed"></div>
-
-                <!-- Team 2 (Right Side) -->
-                <div class="flex-1 flex flex-col justify-center items-center p-4">
-                    <div class="team-label text-center mb-6">Team 2</div>
-                    <div class="space-y-8">
-                        <div class="text-center">
-                            <div class="text-sm text-gray-900 mb-2 font-bold">Attack</div>
-                            <div id="pos-t2-att" class="player-position mx-auto">D</div>
-                            <div id="name-t2-att" class="text-base mt-2 font-black text-gray-900 bg-white bg-opacity-90 rounded px-3 py-1.5">Player D</div>
+                    <!-- Team 2 Area (Bottom) -->
+                    <div class="team-area team2">
+                        <div class="player-container">
+                            <div class="position-indicator">Attack</div>
+                            <div id="pos-t1-att" class="player-position">B</div>
+                            <div id="name-t1-att" class="player-name-display">Player B</div>
                         </div>
-                        <div class="text-center">
-                            <div class="text-sm text-gray-900 mb-2 font-bold">Defense</div>
-                            <div id="pos-t2-def" class="player-position mx-auto">C</div>
-                            <div id="name-t2-def" class="text-base mt-2 font-black text-gray-900 bg-white bg-opacity-90 rounded px-3 py-1.5">Player C</div>
+                        <div class="player-container">
+                            <div class="position-indicator">Defense</div>
+                            <div id="pos-t2-def" class="player-position">C</div>
+                            <div id="name-t2-def" class="player-name-display">Player C</div>
                         </div>
                     </div>
                 </div>
@@ -361,6 +491,8 @@
             currentRound = 0;
             playerMapping = {};
             saveToStorage();
+            // Ensure input fields are rendered with current players
+            renderPlayerInputs();
         }
 
         // Update game display
