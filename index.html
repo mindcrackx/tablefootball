@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Table Football Tournament</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .player-position {
+            @apply w-16 h-16 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold text-lg shadow-lg;
+        }
+        .table-field {
+            @apply bg-green-300 rounded-lg p-6 relative;
+            background: linear-gradient(45deg, #86efac 25%, #4ade80 25%, #4ade80 50%, #86efac 50%, #86efac 75%, #4ade80 75%);
+            background-size: 20px 20px;
+        }
+        .team-label {
+            @apply text-sm font-semibold text-gray-700 mb-2;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <!-- Setup View -->
+    <div id="setup-view" class="container mx-auto px-4 py-8 max-w-md">
+        <h1 class="text-3xl font-bold text-center mb-8 text-gray-800">Table Football Tournament</h1>
+
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-xl font-semibold mb-4 text-gray-700">Enter Player Names</h2>
+
+            <div id="player-inputs" class="space-y-3 mb-6">
+                <!-- Player inputs will be generated here -->
+            </div>
+
+            <div class="flex gap-3 mb-6">
+                <button id="add-player-btn" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded-lg transition-colors">
+                    + Add Player
+                </button>
+                <button id="randomize-btn" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-lg transition-colors">
+                    🎲 Randomize
+                </button>
+            </div>
+
+            <button id="start-tournament-btn" class="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-4 rounded-lg transition-colors">
+                Start Tournament
+            </button>
+        </div>
+    </div>
+
+    <!-- Game View -->
+    <div id="game-view" class="hidden container mx-auto px-4 py-4 max-w-2xl">
+        <div class="bg-white rounded-lg shadow-lg p-4">
+            <!-- Header -->
+            <div class="flex justify-between items-center mb-4">
+                <button id="back-to-setup-btn" class="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm">
+                    ← Back
+                </button>
+                <h2 id="round-display" class="text-lg font-bold text-gray-800">Round 1</h2>
+                <div class="w-16"></div> <!-- Spacer for centering -->
+            </div>
+
+            <!-- Table Football Field -->
+            <div class="table-field mb-4 min-h-[400px] flex">
+                <!-- Team 1 (Left Side) -->
+                <div class="flex-1 flex flex-col justify-center items-center p-4">
+                    <div class="team-label text-center mb-6">Team 1</div>
+                    <div class="space-y-8">
+                        <div class="text-center">
+                            <div class="text-sm text-gray-900 mb-2 font-bold">Defense</div>
+                            <div id="pos-t1-def" class="player-position mx-auto">A</div>
+                            <div id="name-t1-def" class="text-base mt-2 font-black text-gray-900 bg-white bg-opacity-90 rounded px-3 py-1.5">Player A</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-sm text-gray-900 mb-2 font-bold">Attack</div>
+                            <div id="pos-t1-att" class="player-position mx-auto">B</div>
+                            <div id="name-t1-att" class="text-base mt-2 font-black text-gray-900 bg-white bg-opacity-90 rounded px-3 py-1.5">Player B</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Center Line -->
+                <div class="border-l-4 border-white border-dashed"></div>
+
+                <!-- Team 2 (Right Side) -->
+                <div class="flex-1 flex flex-col justify-center items-center p-4">
+                    <div class="team-label text-center mb-6">Team 2</div>
+                    <div class="space-y-8">
+                        <div class="text-center">
+                            <div class="text-sm text-gray-900 mb-2 font-bold">Attack</div>
+                            <div id="pos-t2-att" class="player-position mx-auto">D</div>
+                            <div id="name-t2-att" class="text-base mt-2 font-black text-gray-900 bg-white bg-opacity-90 rounded px-3 py-1.5">Player D</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-sm text-gray-900 mb-2 font-bold">Defense</div>
+                            <div id="pos-t2-def" class="player-position mx-auto">C</div>
+                            <div id="name-t2-def" class="text-base mt-2 font-black text-gray-900 bg-white bg-opacity-90 rounded px-3 py-1.5">Player C</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sitting Players -->
+            <div id="sitting-display" class="hidden bg-yellow-100 rounded-lg p-3 mb-4">
+                <div class="text-sm font-medium text-yellow-800">Sitting this round:</div>
+                <div id="sitting-players" class="text-lg font-bold text-yellow-900"></div>
+            </div>
+
+            <!-- Navigation -->
+            <div class="flex justify-between items-center">
+                <button id="prev-round-btn" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg font-medium">
+                    ← Previous
+                </button>
+                <div id="round-counter" class="text-sm text-gray-600">1 / 24</div>
+                <button id="next-round-btn" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg font-medium">
+                    Next →
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global state
+        let players = [];
+        let rounds = [];
+        let currentRound = 0;
+        let playerMapping = {}; // letter -> name mapping
+
+        // Initialize with 4 players
+        function initializePlayers() {
+            // Try to load from local storage first
+            const savedData = loadFromStorage();
+
+            if (savedData && savedData.players) {
+                players = savedData.players;
+                if (savedData.rounds && savedData.rounds.length > 0) {
+                    rounds = savedData.rounds;
+                    currentRound = savedData.currentRound || 0;
+                    playerMapping = savedData.playerMapping || {};
+
+                    // If we have a complete tournament saved, go directly to game view
+                    showGameView();
+                    updateGameDisplay();
+                    return;
+                }
+            } else {
+                players = [
+                    { letter: 'A', name: '' },
+                    { letter: 'B', name: '' },
+                    { letter: 'C', name: '' },
+                    { letter: 'D', name: '' }
+                ];
+            }
+            renderPlayerInputs();
+        }
+
+        // Render player input fields
+        function renderPlayerInputs() {
+            const container = document.getElementById('player-inputs');
+            container.innerHTML = '';
+
+            players.forEach((player, index) => {
+                const div = document.createElement('div');
+                div.className = 'flex items-center gap-3';
+                div.innerHTML = `
+                    <div class="w-10 h-10 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold">
+                        ${player.letter}
+                    </div>
+                    <input
+                        type="text"
+                        placeholder="Player ${player.letter} name"
+                        value="${player.name}"
+                        class="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        onchange="updatePlayerName(${index}, this.value)"
+                    >
+                    ${players.length > 4 ? `
+                        <button onclick="removePlayer(${index})" class="w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-sm">
+                            ×
+                        </button>
+                    ` : ''}
+                `;
+                container.appendChild(div);
+            });
+
+            // Update add button state
+            const addBtn = document.getElementById('add-player-btn');
+            if (players.length >= 7) {
+                addBtn.disabled = true;
+                addBtn.className = addBtn.className.replace('bg-green-500 hover:bg-green-600', 'bg-gray-400');
+            } else {
+                addBtn.disabled = false;
+                addBtn.className = addBtn.className.replace('bg-gray-400', 'bg-green-500 hover:bg-green-600');
+            }
+        }
+
+        // Update player name
+        function updatePlayerName(index, name) {
+            players[index].name = name;
+            saveToStorage(); // Save whenever names are updated
+        }
+
+        // Add player
+        function addPlayer() {
+            if (players.length < 7) {
+                const nextLetter = String.fromCharCode(65 + players.length); // A, B, C, D, E, F, G
+                players.push({ letter: nextLetter, name: '' });
+                renderPlayerInputs();
+                saveToStorage();
+            }
+        }
+
+        // Remove player
+        function removePlayer(index) {
+            if (players.length > 4) {
+                players.splice(index, 1);
+                // Reassign letters
+                players.forEach((player, i) => {
+                    player.letter = String.fromCharCode(65 + i);
+                });
+                renderPlayerInputs();
+                saveToStorage();
+            }
+        }
+
+        // Randomize player letter assignments
+        function randomizeLetters() {
+            const names = players.map(p => p.name);
+            const letters = players.map(p => p.letter);
+
+            // Shuffle letters using Fisher-Yates algorithm
+            for (let i = letters.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [letters[i], letters[j]] = [letters[j], letters[i]];
+            }
+
+            // Reassign shuffled letters to players
+            players.forEach((player, index) => {
+                player.letter = letters[index];
+            });
+
+            renderPlayerInputs();
+            saveToStorage();
+        }
+
+        // Load CSV data
+        async function loadTournamentData(playerCount) {
+            try {
+                const response = await fetch(`./tournaments/${playerCount}p.csv`);
+                if (!response.ok) {
+                    throw new Error(`Failed to load tournament data for ${playerCount} players`);
+                }
+                const csvText = await response.text();
+                return parseCSV(csvText);
+            } catch (error) {
+                alert(`Error loading tournament data: ${error.message}`);
+                return [];
+            }
+        }
+
+        // Parse CSV
+        function parseCSV(csvText) {
+            const lines = csvText.trim().split('\n');
+            const header = lines[0].split(',');
+            const data = [];
+
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split(',');
+                if (values.length >= 3) {
+                    data.push({
+                        round: parseInt(values[0]),
+                        team1: values[1],
+                        team2: values[2],
+                        sitting: values[3] || ''
+                    });
+                }
+            }
+            return data;
+        }
+
+        // Start tournament
+        async function startTournament() {
+            // Validate all players have names
+            const emptyNames = players.filter(p => !p.name.trim());
+            if (emptyNames.length > 0) {
+                alert('Please enter names for all players');
+                return;
+            }
+
+            // Create player mapping
+            playerMapping = {};
+            players.forEach(player => {
+                playerMapping[player.letter] = player.name.trim();
+            });
+
+            // Load tournament data
+            rounds = await loadTournamentData(players.length);
+            if (rounds.length === 0) {
+                return; // Error already shown in loadTournamentData
+            }
+
+            currentRound = 0;
+            showGameView();
+            updateGameDisplay();
+            saveToStorage(); // Save complete tournament state
+        }
+
+        // Show game view
+        function showGameView() {
+            document.getElementById('setup-view').classList.add('hidden');
+            document.getElementById('game-view').classList.remove('hidden');
+        }
+
+        // Show setup view
+        function showSetupView() {
+            document.getElementById('game-view').classList.add('hidden');
+            document.getElementById('setup-view').classList.remove('hidden');
+            // Clear tournament data when going back to setup
+            rounds = [];
+            currentRound = 0;
+            playerMapping = {};
+            saveToStorage();
+        }
+
+        // Update game display
+        function updateGameDisplay() {
+            if (rounds.length === 0) return;
+
+            const round = rounds[currentRound];
+
+            // Update round display
+            document.getElementById('round-display').textContent = `Round ${round.round}`;
+            document.getElementById('round-counter').textContent = `${currentRound + 1} / ${rounds.length}`;
+
+            // Parse team positions
+            const team1Def = round.team1[0];
+            const team1Att = round.team1[1];
+            const team2Def = round.team2[0];
+            const team2Att = round.team2[1];
+
+            // Update player positions and names
+            document.getElementById('pos-t1-def').textContent = team1Def;
+            document.getElementById('name-t1-def').textContent = playerMapping[team1Def];
+            document.getElementById('pos-t1-att').textContent = team1Att;
+            document.getElementById('name-t1-att').textContent = playerMapping[team1Att];
+            document.getElementById('pos-t2-def').textContent = team2Def;
+            document.getElementById('name-t2-def').textContent = playerMapping[team2Def];
+            document.getElementById('pos-t2-att').textContent = team2Att;
+            document.getElementById('name-t2-att').textContent = playerMapping[team2Att];
+
+            // Update sitting players
+            const sittingDisplay = document.getElementById('sitting-display');
+            const sittingPlayers = document.getElementById('sitting-players');
+
+            if (round.sitting && round.sitting.trim()) {
+                const sittingNames = round.sitting.split('').map(letter =>
+                    `${playerMapping[letter]} (${letter})`
+                ).join(', ');
+                sittingPlayers.textContent = sittingNames;
+                sittingDisplay.classList.remove('hidden');
+            } else {
+                sittingDisplay.classList.add('hidden');
+            }
+        }
+
+        // Navigate rounds
+        function prevRound() {
+            currentRound = currentRound === 0 ? rounds.length - 1 : currentRound - 1;
+            updateGameDisplay();
+            saveToStorage(); // Save current round position
+        }
+
+        function nextRound() {
+            currentRound = currentRound === rounds.length - 1 ? 0 : currentRound + 1;
+            updateGameDisplay();
+            saveToStorage(); // Save current round position
+        }
+
+        // Local storage functions
+        function saveToStorage() {
+            const data = {
+                players: players,
+                rounds: rounds,
+                currentRound: currentRound,
+                playerMapping: playerMapping,
+                timestamp: Date.now()
+            };
+            localStorage.setItem('tablefootball-tournament', JSON.stringify(data));
+        }
+
+        function loadFromStorage() {
+            try {
+                const data = localStorage.getItem('tablefootball-tournament');
+                return data ? JSON.parse(data) : null;
+            } catch (error) {
+                console.error('Failed to load saved data:', error);
+                return null;
+            }
+        }
+
+        function clearStorage() {
+            localStorage.removeItem('tablefootball-tournament');
+        }
+
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            initializePlayers();
+
+            document.getElementById('add-player-btn').addEventListener('click', addPlayer);
+            document.getElementById('randomize-btn').addEventListener('click', randomizeLetters);
+            document.getElementById('start-tournament-btn').addEventListener('click', startTournament);
+            document.getElementById('back-to-setup-btn').addEventListener('click', showSetupView);
+            document.getElementById('prev-round-btn').addEventListener('click', prevRound);
+            document.getElementById('next-round-btn').addEventListener('click', nextRound);
+        });
+    </script>
+</body>
+</html>
