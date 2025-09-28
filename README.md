@@ -2,6 +2,8 @@
 
 An optimal constraint programming solution for scheduling table football tournaments with 4 or more players with only one table, maximizing team variety and position switching.
 
+https://mindcrackx.github.io/tablefootball/
+
 
 ## Quick Start
 
