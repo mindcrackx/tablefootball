@@ -14,15 +14,16 @@ def get_player_position(player, team1, team2):
     else:
         return (1, team2.index(player))
 
-def score_round(candidate, previous_rounds):
+def score_round(candidate, previous_rounds, allow_mirrors=False):
     """Score a candidate round based on how different it is from previous rounds"""
     team1, team2 = candidate
 
-    # Check if this normalized encounter already exists
-    normalized_candidate = normalize_encounter(team1, team2)
-    for prev_team1, prev_team2 in previous_rounds:
-        if normalize_encounter(prev_team1, prev_team2) == normalized_candidate:
-            return 0  # Already seen this encounter
+    if not allow_mirrors:
+        # Check if this normalized encounter already exists (for rounds 1-12)
+        normalized_candidate = normalize_encounter(team1, team2)
+        for prev_team1, prev_team2 in previous_rounds:
+            if normalize_encounter(prev_team1, prev_team2) == normalized_candidate:
+                return 0  # Already seen this encounter
 
     if not previous_rounds:
         return 100  # First round gets full score
@@ -74,13 +75,13 @@ def generate_schedule(num_rounds):
     all_rounds = generate_all_rounds()
     schedule = []
 
-    # Generate unique rounds (max 12 for 4 players)
+    # Generate first 12 unique normalized rounds
     for _ in range(min(num_rounds, 12)):
         best_score = -1
         best_round = None
 
         for candidate in all_rounds:
-            score = score_round(candidate, schedule)
+            score = score_round(candidate, schedule, allow_mirrors=False)
             if score > best_score:
                 best_score = score
                 best_round = candidate
@@ -90,11 +91,27 @@ def generate_schedule(num_rounds):
 
         schedule.append(best_round)
 
-    # If we need more than 12 rounds, repeat by swapping teams
+    # For rounds 13-24, continue using ranking but allow mirror encounters
     if num_rounds > 12:
-        for i in range(num_rounds - 12):
-            original = schedule[i % 12]
-            schedule.append((original[1], original[0]))  # Swap teams
+        remaining_rounds = num_rounds - 12
+        for _ in range(remaining_rounds):
+            best_score = -1
+            best_round = None
+
+            for candidate in all_rounds:
+                # Skip if exact same round already exists (not just normalized)
+                if candidate in schedule:
+                    continue
+
+                score = score_round(candidate, schedule, allow_mirrors=True)
+                if score > best_score:
+                    best_score = score
+                    best_round = candidate
+
+            if best_round is None:
+                break
+
+            schedule.append(best_round)
 
     return schedule
 
