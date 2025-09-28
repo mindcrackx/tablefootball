@@ -4,33 +4,31 @@ import sys
 import itertools
 
 def normalize_encounter(team1, team2):
-    """Normalize encounter by ensuring lexicographically smaller team comes first"""
+    """Normalize encounters so AB vs CD = CD vs AB (same matchup, different sides)"""
     return (team1, team2) if team1 <= team2 else (team2, team1)
 
 def get_player_position(player, team1, team2):
-    """Get (team_index, position) for a player. team_index: 0=team1, 1=team2"""
+    """Returns (team_index, position) where team_index: 0=team1, 1=team2; position: 0=Defense, 1=Attack"""
     if player in team1:
-        return (0, team1.index(player))  # 0=Defense, 1=Attack
+        return (0, team1.index(player))
     else:
         return (1, team2.index(player))
 
 def score_round(candidate, previous_rounds, allow_mirrors=False):
-    """Score a candidate round based on how different it is from previous rounds"""
+    """Score rounds to maximize position changes and space out mirror encounters"""
     team1, team2 = candidate
     normalized_candidate = normalize_encounter(team1, team2)
 
+    # Prevent duplicate normalized encounters in first 12 rounds
     if not allow_mirrors:
-        # Check if this normalized encounter already exists (for rounds 1-12)
         for prev_team1, prev_team2 in previous_rounds:
             if normalize_encounter(prev_team1, prev_team2) == normalized_candidate:
-                return 0  # Already seen this encounter
+                return 0
 
     if not previous_rounds:
-        return 100  # First round gets full score
+        return 100
 
-    # Compare with last round
     last_team1, last_team2 = previous_rounds[-1]
-
     position_changes = 0
     team_changes = 0
 
@@ -43,19 +41,18 @@ def score_round(candidate, previous_rounds, allow_mirrors=False):
         if curr_team_idx != last_team_idx:
             team_changes += 1
 
-    # Base score calculation
+    # Prioritize all players switching positions
     if position_changes == 4:
         score = 100
-        # Bonus for actual team composition change (exactly 2 team changes)
+        # Bonus for actual team composition change (2 team changes = different composition)
+        # 0 or 4 team changes = same composition, just swapped sides
         if team_changes == 2:
             score += 0.5
     else:
-        # Otherwise, score based on individual changes
         score = position_changes * 8 + team_changes * 5
 
-    # Apply recency penalty for mirror encounters (rounds 13+)
+    # Space out mirror encounters to avoid repetition feeling too soon
     if allow_mirrors:
-        # Find how recently this normalized encounter was seen
         rounds_since_last = None
         for i in range(len(previous_rounds) - 1, -1, -1):
             prev_team1, prev_team2 = previous_rounds[i]
@@ -64,19 +61,18 @@ def score_round(candidate, previous_rounds, allow_mirrors=False):
                 break
 
         if rounds_since_last is not None:
-            # Apply penalty based on recency - prefer gaps of 6+ rounds
+            # Heavy penalties for recent mirrors to improve variety perception
             if rounds_since_last <= 2:
-                score -= 50  # Heavy penalty for very recent
+                score -= 50
             elif rounds_since_last <= 4:
-                score -= 25  # Medium penalty
+                score -= 25
             elif rounds_since_last <= 6:
-                score -= 10  # Light penalty
-            # No penalty for 7+ rounds apart
+                score -= 10
 
     return score
 
 def generate_all_rounds():
-    """Generate all possible team combinations and position arrangements"""
+    """Generate all 24 possible combinations of 4 players in 2 teams with 2 positions each"""
     players = ['A', 'B', 'C', 'D']
     rounds = []
 
@@ -92,11 +88,11 @@ def generate_all_rounds():
     return rounds
 
 def generate_schedule(num_rounds):
-    """Generate tournament schedule using ranking approach"""
+    """Generate optimal schedule using ranking approach for both halves"""
     all_rounds = generate_all_rounds()
     schedule = []
 
-    # Generate first 12 unique normalized rounds
+    # First 12 rounds: unique normalized encounters only
     for _ in range(min(num_rounds, 12)):
         best_score = -1
         best_round = None
@@ -112,7 +108,8 @@ def generate_schedule(num_rounds):
 
         schedule.append(best_round)
 
-    # For rounds 13-24, continue using ranking but allow mirror encounters
+    # Rounds 13-24: allow mirror encounters but space them out intelligently
+    # This is much better than naive team swapping which gave poor transitions
     if num_rounds > 12:
         remaining_rounds = num_rounds - 12
         for _ in range(remaining_rounds):
@@ -120,7 +117,6 @@ def generate_schedule(num_rounds):
             best_round = None
 
             for candidate in all_rounds:
-                # Skip if exact same round already exists (not just normalized)
                 if candidate in schedule:
                     continue
 
@@ -151,7 +147,6 @@ def main():
 
     schedule = generate_schedule(num_rounds)
 
-    # Output CSV to stdout
     print("round,team1,team2,sitting")
     for i, (team1, team2) in enumerate(schedule, 1):
         print(f"{i},{team1},{team2},")
