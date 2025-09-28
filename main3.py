@@ -17,10 +17,10 @@ def get_player_position(player, team1, team2):
 def score_round(candidate, previous_rounds, allow_mirrors=False):
     """Score a candidate round based on how different it is from previous rounds"""
     team1, team2 = candidate
+    normalized_candidate = normalize_encounter(team1, team2)
 
     if not allow_mirrors:
         # Check if this normalized encounter already exists (for rounds 1-12)
-        normalized_candidate = normalize_encounter(team1, team2)
         for prev_team1, prev_team2 in previous_rounds:
             if normalize_encounter(prev_team1, prev_team2) == normalized_candidate:
                 return 0  # Already seen this encounter
@@ -43,16 +43,37 @@ def score_round(candidate, previous_rounds, allow_mirrors=False):
         if curr_team_idx != last_team_idx:
             team_changes += 1
 
-    # Prioritize all players switching positions
+    # Base score calculation
     if position_changes == 4:
         score = 100
         # Bonus for actual team composition change (exactly 2 team changes)
         if team_changes == 2:
             score += 0.5
-        return score
+    else:
+        # Otherwise, score based on individual changes
+        score = position_changes * 8 + team_changes * 5
 
-    # Otherwise, score based on individual changes
-    return position_changes * 8 + team_changes * 5
+    # Apply recency penalty for mirror encounters (rounds 13+)
+    if allow_mirrors:
+        # Find how recently this normalized encounter was seen
+        rounds_since_last = None
+        for i in range(len(previous_rounds) - 1, -1, -1):
+            prev_team1, prev_team2 = previous_rounds[i]
+            if normalize_encounter(prev_team1, prev_team2) == normalized_candidate:
+                rounds_since_last = len(previous_rounds) - i
+                break
+
+        if rounds_since_last is not None:
+            # Apply penalty based on recency - prefer gaps of 6+ rounds
+            if rounds_since_last <= 2:
+                score -= 50  # Heavy penalty for very recent
+            elif rounds_since_last <= 4:
+                score -= 25  # Medium penalty
+            elif rounds_since_last <= 6:
+                score -= 10  # Light penalty
+            # No penalty for 7+ rounds apart
+
+    return score
 
 def generate_all_rounds():
     """Generate all possible team combinations and position arrangements"""
