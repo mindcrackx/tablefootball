@@ -28,8 +28,8 @@ python main.py --rounds 24 --players 4
 ### Generate tournament files
 ```bash
 mkdir -p tournaments
-python main.py --rounds 24 --players 4 > ./tournaments/4p.csv
-python main.py --rounds 120 --players 5 > ./tournaments/5p.csv
+python main4.py 24 > ./tournaments/4p.csv
+python main5.py 120 > ./tournaments/5p.csv
 python main.py --rounds 360 --players 6 > ./tournaments/6p.csv
 python main.py --rounds 840 --players 7 > ./tournaments/7p.csv
 ```
