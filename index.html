@@ -577,8 +577,16 @@
 
         // Dark mode functions
         function initializeTheme() {
-            const savedTheme = localStorage.getItem('tablefootball-theme') || 'light';
-            const isDark = savedTheme === 'dark';
+            const savedTheme = localStorage.getItem('tablefootball-theme');
+            let isDark;
+
+            if (savedTheme) {
+                // Use saved preference if it exists
+                isDark = savedTheme === 'dark';
+            } else {
+                // Use system preference if no saved preference
+                isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            }
 
             if (isDark) {
                 document.documentElement.classList.add('dark');
